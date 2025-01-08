@@ -7,7 +7,7 @@ This application allows users to create a list of countries they'd like to visit
 ### Backend
 1. Navigate to the `backend` directory.
 2. Run `npm install` to install dependencies.
-3. Set up your PostgreSQL database and update the `.env` file with your database URL.
+3. Set up your MySQL database and update the `.env` file with your database URL.
 4. Run `npm start` to start the server.
 
 ### Frontend
@@ -32,7 +32,7 @@ This application allows users to create a list of countries they'd like to visit
 ## Technologies Used
 - **Frontend**: React
 - **Backend**: Node.js with Express
-- **Database**: PostgreSQL
+- **Database**: MySQL
 - **External API**: REST Countries API
 - **CI/CD**: To be implemented with [CI/CD tools, e.g., GitHub Actions, Jenkins, or Azure DevOps]
 - **Infrastructure as Code**: To be implemented with tools like Terraform or Helm
