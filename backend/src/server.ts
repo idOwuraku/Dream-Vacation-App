@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Define an interface for our Destination data structure
 interface Destination {
   id: number;
   country: string;
@@ -15,7 +14,7 @@ interface Destination {
   region?: string;
 }
 
-// Define the structure of the expected API response from the external service
+
 interface CountryAPIResponse {
     capital: string[];
     population: number;
@@ -26,11 +25,10 @@ interface CountryAPIResponse {
 const app: Express = express();
 const port: number = parseInt(process.env.PORT || '3001', 10);
 
-// Middleware
+
 app.use(cors());
 app.use(express.json());
 
-// MySQL Connection Pool
 const pool: Pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -39,7 +37,6 @@ const pool: Pool = mysql.createPool({
   port: parseInt(process.env.DB_PORT || '3306', 10),
 });
 
-// Ensure the table exists
 const createTable = async (): Promise<void> => {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS destinations (
@@ -57,16 +54,12 @@ const createTable = async (): Promise<void> => {
     console.log('Table "destinations" ensured.');
   } catch (err: any) {
     console.error('Error ensuring table "destinations":', err.message);
-    process.exit(1); // Exit the app if the table creation fails
+    process.exit(1); 
   }
 };
 
-// Initialize the table on server startup
 createTable();
 
-// --- Routes ---
-
-// GET /api/destinations
 app.get('/api/destinations', async (req: Request, res: Response) => {
   try {
     const [rows] = await pool.query<Destination[] & RowDataPacket[]>('SELECT * FROM destinations ORDER BY id DESC');
@@ -77,7 +70,6 @@ app.get('/api/destinations', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/destinations
 app.post('/api/destinations', async (req: Request<{}, {}, { country: string }>, res: Response) => {
   const { country } = req.body;
   if (!country) {
@@ -85,11 +77,9 @@ app.post('/api/destinations', async (req: Request<{}, {}, { country: string }>, 
   }
 
   try {
-    // Fetch country data from external API
     const response = await axios.get<CountryAPIResponse[]>(`${process.env.COUNTRIES_API_BASE_URL}/name/${encodeURIComponent(country)}`);
     const countryInfo = response.data[0];
 
-    // Insert data into the MySQL database
     const [result] = await pool.query<mysql.ResultSetHeader>(
       'INSERT INTO destinations (country, capital, population, region) VALUES (?, ?, ?, ?)',
       [country, countryInfo.capital[0], countryInfo.population, countryInfo.region]
@@ -109,7 +99,6 @@ app.post('/api/destinations', async (req: Request<{}, {}, { country: string }>, 
   }
 });
 
-// DELETE /api/destinations/:id
 app.delete('/api/destinations/:id', async (req: Request<{ id: string }>, res: Response) => {
   const { id } = req.params;
   try {
@@ -121,7 +110,6 @@ app.delete('/api/destinations/:id', async (req: Request<{ id: string }>, res: Re
   }
 });
 
-// Start Server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
