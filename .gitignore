@@ -3,20 +3,51 @@ node_modules/
 npm-debug.log*
 package-lock.json
 
+# Local Environment Variables
+# These files can contain sensitive information and should not be committed.
 frontend/.env
 .env
-.env.*         
+.env.*
 
 # Logs
 logs/
 *.log
 
+# OS-specific
 .DS_Store
 Thumbs.db
 
+# Build output
 dist/
 build/
 
+# IDE files
 .vscode/
 .idea/
 *.sw?
+
+# Terraform
+# Ignore local Terraform state files, which can contain sensitive data.
+terraform.tfstate
+terraform.tfstate.backup
+
+# Ignore local variable definitions.
+# IMPORTANT: DO commit example files (e.g., terraform.tfvars.example)
+terraform.tfvars
+*.tfvars.json
+
+# Ignore crash log files
+crash.log
+crash.*.log
+
+# Ignore provider plugins and modules downloaded by 'terraform init'.
+.terraform/
+
+# Ignore plan files, which can contain sensitive data.
+*.tfplan
+
+# Ignore local override files.
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

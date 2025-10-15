@@ -1,0 +1,135 @@
+name: Build, Push, and Deploy Application
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCR_HOSTNAME: gcr.io
+  GCE_INSTANCE_NAME: 'dream-vacations-server' 
+  GCE_ZONE: 'africa-south1-a'               
+
+jobs:
+  check-paths:
+    name: Check for file changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/docker-publish.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/docker-publish.yml'
+
+  build-and-push-backend:
+    name: Build and Push Backend
+    runs-on: ubuntu-latest
+    needs: check-paths
+    if: needs.check-paths.outputs.backend == 'true'
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SA_EMAIL }}
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.GCR_HOSTNAME }}
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_NAME=backend
+          docker build . --tag ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}:${{ github.sha }}
+          docker push ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}:${{ github.sha }}
+        working-directory: ./backend
+
+  build-and-push-frontend:
+    name: Build and Push Frontend
+    runs-on: ubuntu-latest
+    needs: check-paths
+    if: needs.check-paths.outputs.frontend == 'true'
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SA_EMAIL }}
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.GCR_HOSTNAME }}
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_NAME=frontend
+          docker build . --tag ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}:${{ github.sha }}
+          docker push ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}:${{ github.sha }}
+        working-directory: ./frontend
+
+  deploy-backend:
+    name: Deploy Backend to GCE
+    runs-on: ubuntu-latest
+    needs: build-and-push-backend
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SA_EMAIL }}
+      - name: Deploy to GCE via SSH
+        uses: 'google-github-actions/ssh-execute@v1'
+        with:
+          instance_name: ${{ env.GCE_INSTANCE_NAME }}
+          zone: ${{ env.GCE_ZONE }}
+          command: |
+            docker pull gcr.io/${{ env.GCP_PROJECT_ID }}/backend:${{ github.sha }}
+            docker stop backend-container || true
+            docker rm backend-container || true
+            docker run -d --name backend-container -p 3001:3001 --restart always \
+              gcr.io/${{ env.GCP_PROJECT_ID }}/backend:${{ github.sha }}
+
+  deploy-frontend:
+    name: Deploy Frontend to GCE
+    runs-on: ubuntu-latest
+    needs: build-and-push-frontend
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SA_EMAIL }}
+      - name: Deploy to GCE via SSH
+        uses: 'google-github-actions/ssh-execute@v1'
+        with:
+          instance_name: ${{ env.GCE_INSTANCE_NAME }}
+          zone: ${{ env.GCE_ZONE }}
+          command: |
+            docker pull gcr.io/${{ env.GCP_PROJECT_ID }}/frontend:${{ github.sha }}
+            docker stop frontend-container || true
+            docker rm frontend-container || true
+            docker run -d --name frontend-container -p 80:80 --restart always \
+              gcr.io/${{ env.GCP_PROJECT_ID }}/frontend:${{ github.sha }}
