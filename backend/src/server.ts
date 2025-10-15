@@ -29,6 +29,7 @@ const port: number = parseInt(process.env.PORT || '3001', 10);
 app.use(cors());
 app.use(express.json());
 
+//MySQL Database Pool
 const pool: Pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
