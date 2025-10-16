@@ -12,6 +12,7 @@ env:
 
 jobs:
   check-paths:
+    # ... (this job remains unchanged) ...
     name: Check for file changes
     runs-on: ubuntu-latest
     outputs:
@@ -31,6 +32,7 @@ jobs:
               - '.github/workflows/docker-publish.yml'
 
   build-and-push-backend:
+    # ... (this job remains unchanged) ...
     name: Build and Push Backend
     runs-on: ubuntu-latest
     needs: check-paths
@@ -56,6 +58,7 @@ jobs:
         working-directory: ./backend
 
   build-and-push-frontend:
+    # ... (this job remains unchanged) ...
     name: Build and Push Frontend
     runs-on: ubuntu-latest
     needs: check-paths
@@ -90,17 +93,16 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.GCE_INSTANCE_IP }}
-          username: app-user # The username from your Terraform metadata
+          username: app-user
           key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
           script: |
-            # Pull the new image from GCR
-            docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
+            # Authenticate Docker on the GCE instance
+            gcloud auth configure-docker gcr.io -q
             
-            # Stop and remove the old container
+            # Now, pull the image
+            docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
             docker stop backend-container || true
             docker rm backend-container || true
-            
-            # Run the new container with environment variables
             docker run -d --name backend-container -p 3001:3001 --restart always \
               -e PORT=3001 \
               -e DB_USER="dev" \
@@ -121,6 +123,10 @@ jobs:
           username: app-user
           key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
           script: |
+            # Authenticate Docker on the GCE instance
+            gcloud auth configure-docker gcr.io -q
+
+            # Now, pull the image
             docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/frontend:${{ github.sha }}
             docker stop frontend-container || true
             docker rm frontend-container || true

@@ -115,3 +115,5 @@ app.delete('/api/destinations/:id', async (req: Request<{ id: string }>, res: Re
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
+//remove later
