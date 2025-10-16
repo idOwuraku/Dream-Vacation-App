@@ -16,8 +16,6 @@ resource "google_secret_manager_secret_iam_member" "secret_accessor" {
   member    = "serviceAccount:${google_service_account.gce_sa.email}"
 }
 
-
-#Instance Change
 resource "google_compute_instance" "main" {
   project      = var.project_id
   name         = var.instance_name

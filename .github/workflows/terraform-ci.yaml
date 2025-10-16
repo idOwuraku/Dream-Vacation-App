@@ -2,28 +2,34 @@ name: Terraform CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
-      - 'terraform/**'
+      - "terraform/**"
   pull_request:
     paths:
-      - 'terraform/**'
+      - "terraform/**"
 
 jobs:
   terraform:
     name: Terraform Plan and Apply
     runs-on: ubuntu-latest
     permissions:
-      contents: 'read'
-      id-token: 'write'
-      pull-requests: 'write'
+      contents: "read"
+      id-token: "write"
+      pull-requests: "write"
+
+    env:
+      TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      TF_VAR_initial_db_password: ${{ secrets.TF_VAR_initial_db_password }}
+      TF_VAR_ssh_public_key_path: "~/.ssh/id_rsa.pub"
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Authenticate to Google Cloud
-        uses: 'google-github-actions/auth@v2'
+        uses: "google-github-actions/auth@v2"
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_WIF_SA_EMAIL }}
@@ -32,6 +38,11 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.5.0
+
+      - name: Create SSH Public Key File
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GCE_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
 
       - name: Terraform Init
         id: init
