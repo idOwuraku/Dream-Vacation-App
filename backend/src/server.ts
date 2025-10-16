@@ -38,6 +38,8 @@ const pool: Pool = mysql.createPool({
   port: parseInt(process.env.DB_PORT || '3306', 10),
 });
 
+
+// table creating
 const createTable = async (): Promise<void> => {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS destinations (
