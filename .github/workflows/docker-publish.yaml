@@ -54,8 +54,7 @@ jobs:
           IMAGE_NAME=backend
           docker build . --tag ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}:${{ github.sha }}
           docker build . --tag ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}:latest
-          docker push ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}:${{ github.sha }}
-          docker push ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}:latest
+          docker push --all-tags ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}
         working-directory: ./backend
 
   build-and-push-frontend:
@@ -81,8 +80,7 @@ jobs:
           IMAGE_NAME=frontend
           docker build . --tag ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}:${{ github.sha }}
           docker build . --tag ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}:latest
-          docker push ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}:${{ github.sha }}
-          docker push ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}:latest
+          docker push --all-tags ${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${IMAGE_NAME}
         working-directory: ./frontend
 
   deploy:
@@ -112,31 +110,10 @@ jobs:
           username: app-user
           key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
           script: |
-            # 1. Ensure Docker and Docker Compose are installed
-            if ! docker compose version &> /dev/null; then
-              echo "Docker Compose V2 not found, installing..."
-              sudo apt-get update
-              sudo apt-get install -y docker.io curl
-              sudo usermod -aG docker app-user
-              
-              # Manually install the Docker Compose plugin
-              sudo mkdir -p /usr/local/lib/docker/cli-plugins
-              sudo curl -SL "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
-              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-            fi
-            
-            # 2. Authenticate Docker to GCR
-            # Ensure gcloud is installed before using it
-            if ! [ -x "$(command -v gcloud)" ]; then
-              echo "gcloud not found, installing..."
-              sudo apt-get install -y apt-transport-https ca-certificates gnupg
-              echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-              curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-              sudo apt-get update && sudo apt-get install -y google-cloud-sdk
-            fi
-            gcloud auth configure-docker gcr.io -q
-            
-            # 3. Create a production .env file from GitHub Secrets
+            # Navigate to the app directory where compose.yaml was copied
+            cd ~/app
+
+            # 1. Create a production .env file from GitHub Secrets
             echo "Creating production .env file..."
             cat << EOF > .env
             GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
@@ -147,7 +124,28 @@ jobs:
             COUNTRIES_API_BASE_URL=${{ secrets.COUNTRIES_API_BASE_URL }}
             EOF
             
-            # 4. Pull the latest images and run the application
+            # 2. Ensure Docker and Docker Compose are installed
+            if ! docker compose version &> /dev/null; then
+              echo "Docker Compose V2 not found, installing..."
+              sudo apt-get update
+              sudo apt-get install -y docker.io curl
+              sudo usermod -aG docker app-user
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins
+              sudo curl -SL "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+            fi
+            
+            # 3. Authenticate Docker to GCR
+            if ! [ -x "$(command -v gcloud)" ]; then
+              echo "gcloud not found, installing..."
+              sudo apt-get install -y apt-transport-https ca-certificates gnupg
+              echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+              curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+              sudo apt-get update && sudo apt-get install -y google-cloud-sdk
+            fi
+            gcloud auth configure-docker gcr.io -q
+            
+            # 4. Pull the latest images and run the application stack
             echo "Starting application with Docker Compose..."
             docker compose pull
             docker compose up -d
