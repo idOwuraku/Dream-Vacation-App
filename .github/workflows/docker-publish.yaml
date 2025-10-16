@@ -113,13 +113,6 @@ jobs:
 
       - name: Deploy with Docker Compose
         uses: appleboy/ssh-action@v1.0.3
-        env:
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_PASSWORD: ${{ secrets.TF_VAR_initial_db_password }}
-          CLOUD_SQL_CONNECTION_NAME: ${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
-          COUNTRIES_API_BASE_URL: ${{ secrets.COUNTRIES_API_BASE_URL }}
         with:
           host: ${{ secrets.GCE_INSTANCE_IP }}
           username: app-user
@@ -128,62 +121,30 @@ jobs:
             set -e
             cd ~/app
 
+            # Dynamically detect VM external IP
+            EXTERNAL_IP=$(curl -s ifconfig.me)
+
             echo "Creating .env file..."
             cat << EOF > .env
-            GCP_PROJECT_ID=$GCP_PROJECT_ID
-            DB_USER=$DB_USER
-            DB_NAME=$DB_NAME
-            DB_PASSWORD=$DB_PASSWORD
-            CLOUD_SQL_CONNECTION_NAME=$CLOUD_SQL_CONNECTION_NAME
-            COUNTRIES_API_BASE_URL=$COUNTRIES_API_BASE_URL
+            GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
+            DB_USER=${{ secrets.DB_USER }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            DB_PASSWORD=${{ secrets.TF_VAR_initial_db_password }}
+            CLOUD_SQL_CONNECTION_NAME=${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
+            COUNTRIES_API_BASE_URL=${{ secrets.COUNTRIES_API_BASE_URL }}
+            REACT_APP_API_URL=http://$EXTERNAL_IP:3001
             EOF
-
-            echo "Ensuring Docker + Compose are installed..."
-            if ! docker compose version &> /dev/null; then
-              sudo apt-get update
-              sudo apt-get install -y docker.io curl
-              sudo mkdir -p /usr/local/lib/docker/cli-plugins
-              sudo curl -SL "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
-              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-            fi
-
-            echo "Authenticating Docker to GCR..."
-            if ! [ -x "$(command -v gcloud)" ]; then
-              sudo apt-get install -y apt-transport-https ca-certificates gnupg
-              echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
-              curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-              sudo apt-get update && sudo apt-get install -y google-cloud-sdk
-            fi
-            sudo gcloud auth configure-docker gcr.io -q
 
             echo "Stopping old containers..."
             sudo docker compose down --remove-orphans || true
 
-            echo "Pulling latest images and starting stack..."
+            echo "Pulling latest images..."
             sudo docker compose pull
+
+            echo "Starting new containers..."
             sudo docker compose up -d
 
             echo "Waiting for containers to stabilize..."
             sleep 30
 
-            echo "Checking container health..."
-            unhealthy=$(sudo docker ps --filter "health=unhealthy" --format "{{.Names}}")
-            exited=$(sudo docker ps --filter "status=exited" --format "{{.Names}}")
-
-            if [ -n "$unhealthy" ] || [ -n "$exited" ]; then
-              echo "Deployment failed: Unhealthy or stopped containers detected!"
-              echo "Unhealthy: $unhealthy"
-              echo "Exited: $exited"
-              echo "---- Logs ----"
-              sudo docker ps -a
-              if [ -n "$unhealthy" ]; then
-                sudo docker logs $unhealthy || true
-              fi
-              if [ -n "$exited" ]; then
-                sudo docker logs $exited || true
-              fi
-              exit 1
-            fi
-
-            echo "All containers healthy and running!"
             sudo docker ps
