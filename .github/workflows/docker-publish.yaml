@@ -123,26 +123,32 @@ jobs:
             EOF
             
             # 2. Ensure Docker and Docker Compose are installed
-            # (This part is correct and only runs if needed)
             if ! docker compose version &> /dev/null; then
               echo "Installing Docker and Docker Compose..."
               sudo apt-get update
-              sudo apt-get install -y docker-compose-plugin docker.io
+              sudo apt-get install -y docker.io curl
               sudo usermod -aG docker app-user
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins
+              sudo curl -SL "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
             fi
             
             # 3. Authenticate Docker to GCR
             if ! [ -x "$(command -v gcloud)" ]; then
               echo "gcloud not found, installing..."
-              sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
+              sudo apt-get install -y apt-transport-https ca-certificates gnupg
               echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
               curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
               sudo apt-get update && sudo apt-get install -y google-cloud-sdk
             fi
             sudo gcloud auth configure-docker gcr.io -q
             
-            # 4. Pull fresh images, tear down the old stack, and start the new one
+            # 4. Forcefully clean up any old containers before starting
+            echo "Cleaning up old containers..."
+            sudo docker stop frontend-container backend-container cloud-sql-proxy || true
+            sudo docker rm frontend-container backend-container cloud-sql-proxy || true
+
+            # 5. Pull fresh images and start the new stack
             echo "Starting application with Docker Compose..."
             sudo docker compose pull
-            sudo docker compose down
             sudo docker compose up -d
