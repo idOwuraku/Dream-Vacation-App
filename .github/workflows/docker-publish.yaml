@@ -9,8 +9,6 @@ on:
 env:
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   GCR_HOSTNAME: gcr.io
-  GCE_INSTANCE_NAME: 'dream-vacations-server' 
-  GCE_ZONE: 'africa-south1-a'               
 
 jobs:
   check-paths:
@@ -87,49 +85,44 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push-backend
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: 'read'
-      id-token: 'write'
     steps:
-      - name: Authenticate to Google Cloud
-        uses: 'google-github-actions/auth@v2'
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
-          service_account: ${{ secrets.GCP_WIF_SA_EMAIL }}
       - name: Deploy to GCE via SSH
-        uses: 'google-github-actions/ssh-execute@v1'
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          instance_name: ${{ env.GCE_INSTANCE_NAME }}
-          zone: ${{ env.GCE_ZONE }}
-          command: |
-            docker pull gcr.io/${{ env.GCP_PROJECT_ID }}/backend:${{ github.sha }}
+          host: ${{ secrets.GCE_INSTANCE_IP }}
+          username: app-user # The username from your Terraform metadata
+          key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
+          script: |
+            # Pull the new image from GCR
+            docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
+            
+            # Stop and remove the old container
             docker stop backend-container || true
             docker rm backend-container || true
+            
+            # Run the new container with environment variables
             docker run -d --name backend-container -p 3001:3001 --restart always \
-              gcr.io/${{ env.GCP_PROJECT_ID }}/backend:${{ github.sha }}
+              -e PORT=3001 \
+              -e DB_USER="app_user" \
+              -e DB_NAME="dream_vacations_db" \
+              -e DB_HOST="${{ secrets.CLOUD_SQL_CONNECTION_NAME }}" \
+              gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
 
   deploy-frontend:
     name: Deploy Frontend to GCE
     runs-on: ubuntu-latest
     needs: build-and-push-frontend
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: 'read'
-      id-token: 'write'
     steps:
-      - name: Authenticate to Google Cloud
-        uses: 'google-github-actions/auth@v2'
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
-          service_account: ${{ secrets.GCP_WIF_SA_EMAIL }}
       - name: Deploy to GCE via SSH
-        uses: 'google-github-actions/ssh-execute@v1'
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          instance_name: ${{ env.GCE_INSTANCE_NAME }}
-          zone: ${{ env.GCE_ZONE }}
-          command: |
-            docker pull gcr.io/${{ env.GCP_PROJECT_ID }}/frontend:${{ github.sha }}
+          host: ${{ secrets.GCE_INSTANCE_IP }}
+          username: app-user
+          key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
+          script: |
+            docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/frontend:${{ github.sha }}
             docker stop frontend-container || true
             docker rm frontend-container || true
             docker run -d --name frontend-container -p 80:80 --restart always \
-              gcr.io/${{ env.GCP_PROJECT_ID }}/frontend:${{ github.sha }}
+              gcr.io/${{ secrets.GCP_PROJECT_ID }}/frontend:${{ github.sha }}
