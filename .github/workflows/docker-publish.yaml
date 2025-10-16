@@ -104,16 +104,20 @@ jobs:
             docker stop backend-container || true
             docker rm backend-container || true
             
-            # 2. Start the Cloud SQL Auth Proxy on the shared network
+            # 2. Start the Cloud SQL Auth Proxy
             docker run -d --name cloud-sql-proxy --restart always \
               --network dream-vacation-net \
               gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.2 \
               --public-ip ${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
 
-            # 3. Pull the new backend image
+            # 3. Wait for the proxy to initialize before starting the backend
+            echo "Waiting for the Cloud SQL Auth Proxy to start..."
+            sleep 5
+            
+            # 4. Pull the new backend image
             docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
             
-            # 4. Run the backend container on the same network
+            # 5. Run the backend container
             docker run -d --name backend-container --restart always \
               --network dream-vacation-net \
               -p 3001:3001 \
