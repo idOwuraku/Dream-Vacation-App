@@ -25,7 +25,7 @@ interface CountryAPIResponse {
 const app: Express = express();
 const port: number = parseInt(process.env.PORT || '3001', 10);
 
-
+// Middlewares
 app.use(cors());
 app.use(express.json());
 
