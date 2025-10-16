@@ -113,6 +113,13 @@ jobs:
 
       - name: Deploy with Docker Compose
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_PASSWORD: ${{ secrets.TF_VAR_initial_db_password }}
+          CLOUD_SQL_CONNECTION_NAME: ${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
+          COUNTRIES_API_BASE_URL: ${{ secrets.COUNTRIES_API_BASE_URL }}
         with:
           host: ${{ secrets.GCE_INSTANCE_IP }}
           username: app-user
@@ -122,13 +129,13 @@ jobs:
             cd ~/app
 
             echo "Creating .env file..."
-            cat << 'EOF' > .env
-            GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
-            DB_USER=${{ secrets.DB_USER }}
-            DB_NAME=${{ secrets.DB_NAME }}
-            DB_PASSWORD=${{ secrets.TF_VAR_initial_db_password }}
-            CLOUD_SQL_CONNECTION_NAME=${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
-            COUNTRIES_API_BASE_URL=${{ secrets.COUNTRIES_API_BASE_URL }}
+            cat << EOF > .env
+            GCP_PROJECT_ID=$GCP_PROJECT_ID
+            DB_USER=$DB_USER
+            DB_NAME=$DB_NAME
+            DB_PASSWORD=$DB_PASSWORD
+            CLOUD_SQL_CONNECTION_NAME=$CLOUD_SQL_CONNECTION_NAME
+            COUNTRIES_API_BASE_URL=$COUNTRIES_API_BASE_URL
             EOF
 
             echo "Ensuring Docker + Compose are installed..."
