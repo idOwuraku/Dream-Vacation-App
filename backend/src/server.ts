@@ -39,7 +39,6 @@ const pool: Pool = mysql.createPool({
 });
 
 
-// table creating
 const createTable = async (): Promise<void> => {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS destinations (
