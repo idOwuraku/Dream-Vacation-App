@@ -2,9 +2,9 @@ name: Build, Push, and Deploy Application
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -36,13 +36,13 @@ jobs:
     needs: check-paths
     if: needs.check-paths.outputs.backend == 'true'
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: "read"
+      id-token: "write"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
       - name: Authenticate to Google Cloud
-        uses: 'google-github-actions/auth@v2'
+        uses: "google-github-actions/auth@v2"
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_WIF_SA_EMAIL }}
@@ -61,13 +61,13 @@ jobs:
     needs: check-paths
     if: needs.check-paths.outputs.frontend == 'true'
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: "read"
+      id-token: "write"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
       - name: Authenticate to Google Cloud
-        uses: 'google-github-actions/auth@v2'
+        uses: "google-github-actions/auth@v2"
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_WIF_SA_EMAIL }}
@@ -99,18 +99,13 @@ jobs:
               sleep 2
             done
 
-            # Check for Docker and install if not present
+            # Install Docker and gcloud if they are not present
             if ! [ -x "$(command -v docker)" ]; then
-              echo "Docker not found, installing..."
-              sudo apt-get update
-              sudo apt-get install -y docker.io
+              sudo apt-get update && sudo apt-get install -y docker.io
               sudo usermod -aG docker app-user
             fi
-            
-            # Check for gcloud and install if not present
             if ! [ -x "$(command -v gcloud)" ]; then
-              echo "gcloud not found, installing..."
-              sudo apt-get install -y apt-transport-https-ca-certificates gnupg curl
+              sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
               echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
               curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
               sudo apt-get update && sudo apt-get install -y google-cloud-sdk
@@ -118,18 +113,34 @@ jobs:
 
             # Authenticate Docker to GCR
             gcloud auth configure-docker gcr.io -q
-            
-            # Deploy the container, pulling all config from secrets
-            docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
+
+            # ---- DEPLOYMENT LOGIC ----
+
+            # 1. Stop and remove old containers
+            docker stop cloud-sql-proxy || true
+            docker rm cloud-sql-proxy || true
             docker stop backend-container || true
             docker rm backend-container || true
-            docker run -d --name backend-container -p 3001:3001 --restart always \
+
+            # 2. Start the Cloud SQL Auth Proxy
+            docker run -d --name cloud-sql-proxy --restart always \
+              gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.2 \
+              --public-ip ${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
+
+            # 3. Pull the new backend image
+            docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
+
+            # 4. Run the backend container, connecting to the proxy on localhost
+            docker run -d --name backend-container --restart always \
+              --network="container:cloud-sql-proxy" \
+              -p 3001:3001 \
               -e PORT=3001 \
               -e DB_USER="${{ secrets.DB_USER }}" \
               -e DB_NAME="${{ secrets.DB_NAME }}" \
-              -e DB_HOST="${{ secrets.CLOUD_SQL_CONNECTION_NAME }}" \
+              -e DB_HOST="127.0.0.1" \
               -e COUNTRIES_API_BASE_URL="${{ secrets.COUNTRIES_API_BASE_URL }}" \
               gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
+
   deploy-frontend:
     name: Deploy Frontend to GCE
     runs-on: ubuntu-latest
@@ -156,7 +167,7 @@ jobs:
               sudo apt-get install -y docker.io
               sudo usermod -aG docker app-user
             fi
-            
+
             # Check for gcloud and install if not present
             if ! [ -x "$(command -v gcloud)" ]; then
               echo "gcloud not found, installing..."
@@ -168,7 +179,7 @@ jobs:
 
             # Authenticate Docker to GCR
             gcloud auth configure-docker gcr.io -q
-            
+
             # Deploy the frontend container
             docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/frontend:${{ github.sha }}
             docker stop frontend-container || true
