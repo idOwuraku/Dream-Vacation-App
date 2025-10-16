@@ -123,6 +123,7 @@ jobs:
             EOF
             
             # 2. Ensure Docker and Docker Compose are installed
+            # (This part is correct and only runs if needed)
             if ! docker compose version &> /dev/null; then
               echo "Installing Docker and Docker Compose..."
               sudo apt-get update
@@ -131,7 +132,6 @@ jobs:
             fi
             
             # 3. Authenticate Docker to GCR
-            # The gcloud install script is now inside the if block
             if ! [ -x "$(command -v gcloud)" ]; then
               echo "gcloud not found, installing..."
               sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
@@ -141,7 +141,8 @@ jobs:
             fi
             sudo gcloud auth configure-docker gcr.io -q
             
-            # 4. Pull the latest images and run the application with sudo
+            # 4. Pull fresh images, tear down the old stack, and start the new one
             echo "Starting application with Docker Compose..."
             sudo docker compose pull
+            sudo docker compose down
             sudo docker compose up -d
