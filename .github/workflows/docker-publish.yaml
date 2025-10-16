@@ -93,6 +93,12 @@ jobs:
           username: app-user
           key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
           script: |
+            # Wait for any automatic system updates to finish
+            while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+              echo "Waiting for other software managers to finish..."
+              sleep 2
+            done
+
             # Check for Docker and install if not present
             if ! [ -x "$(command -v docker)" ]; then
               echo "Docker not found, installing..."
@@ -100,7 +106,7 @@ jobs:
               sudo apt-get install -y docker.io
               sudo usermod -aG docker app-user
             fi
-
+            
             # Check for gcloud and install if not present
             if ! [ -x "$(command -v gcloud)" ]; then
               echo "gcloud not found, installing..."
@@ -112,7 +118,7 @@ jobs:
 
             # Authenticate Docker to GCR
             gcloud auth configure-docker gcr.io -q
-
+            
             # Deploy the container
             docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
             docker stop backend-container || true
@@ -137,6 +143,12 @@ jobs:
           username: app-user
           key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
           script: |
+            # Wait for any automatic system updates to finish
+            while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+              echo "Waiting for other software managers to finish..."
+              sleep 2
+            done
+
             # Check for Docker and install if not present
             if ! [ -x "$(command -v docker)" ]; then
               echo "Docker not found, installing..."
