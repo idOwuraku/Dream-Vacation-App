@@ -33,7 +33,7 @@ services:
       - COUNTRIES_API_BASE_URL=${COUNTRIES_API_BASE_URL}
     depends_on:
       cloud-sql-proxy:
-        condition: service_healthy
+        condition: service_started  # changed from service_healthy for now
 
   cloud-sql-proxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.2
@@ -42,15 +42,10 @@ services:
     networks:
       - dream-vacation-net
     command:
-      # Correct v2 syntax: INSTANCE --flags
       - "${CLOUD_SQL_CONNECTION_NAME}"
-      - "--address=0.0.0.0" # Listen on all network interfaces
-      - "--port=3306"       # CORRECTED: The default MySQL port
-      - "--health-check"    # Enable the health check endpoint
-    # The health check port does not need to be exposed to the host.
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/healthz || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
+      - "--address=0.0.0.0"
+      - "--port=3306"
+      - "--health-check"
+    # Expose healthcheck port only internally
+    expose:
+      - "3306"
