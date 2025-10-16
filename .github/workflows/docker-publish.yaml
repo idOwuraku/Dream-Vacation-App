@@ -93,51 +93,34 @@ jobs:
           username: app-user
           key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
           script: |
-            # Wait for any automatic system updates to finish
-            while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
-              echo "Waiting for other software managers to finish..."
-              sleep 2
-            done
+            # Create a shared Docker network if it doesn't already exist
+            docker network create dream-vacation-net || true
 
-            # Install Docker and gcloud if they are not present
-            if ! [ -x "$(command -v docker)" ]; then
-              sudo apt-get update && sudo apt-get install -y docker.io
-              sudo usermod -aG docker app-user
-            fi
-            if ! [ -x "$(command -v gcloud)" ]; then
-              sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
-              echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-              curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
-              sudo apt-get update && sudo apt-get install -y google-cloud-sdk
-            fi
-
-            # Authenticate Docker to GCR
-            gcloud auth configure-docker gcr.io -q
-
-            # ---- DEPLOYMENT LOGIC ----
+            # --- DEPLOYMENT LOGIC ---
 
             # 1. Stop and remove old containers
             docker stop cloud-sql-proxy || true
             docker rm cloud-sql-proxy || true
             docker stop backend-container || true
             docker rm backend-container || true
-
-            # 2. Start the Cloud SQL Auth Proxy
+            
+            # 2. Start the Cloud SQL Auth Proxy on the shared network
             docker run -d --name cloud-sql-proxy --restart always \
+              --network dream-vacation-net \
               gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.2 \
               --public-ip ${{ secrets.CLOUD_SQL_CONNECTION_NAME }}
 
             # 3. Pull the new backend image
             docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
-
-            # 4. Run the backend container, connecting to the proxy on localhost
+            
+            # 4. Run the backend container on the same network
             docker run -d --name backend-container --restart always \
-              --network="container:cloud-sql-proxy" \
+              --network dream-vacation-net \
               -p 3001:3001 \
               -e PORT=3001 \
               -e DB_USER="${{ secrets.DB_USER }}" \
               -e DB_NAME="${{ secrets.DB_NAME }}" \
-              -e DB_HOST="127.0.0.1" \
+              -e DB_HOST="cloud-sql-proxy" \
               -e COUNTRIES_API_BASE_URL="${{ secrets.COUNTRIES_API_BASE_URL }}" \
               gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
 
