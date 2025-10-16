@@ -1,52 +1,40 @@
 version: '3.8'
 
-# This defines the shared network that allows containers to communicate by name.
 networks:
   dream-vacation-net:
     driver: bridge
 
 services:
-  # The Frontend Service (React App)
   frontend:
-    # The image will be pulled from GCR. We use the 'latest' tag for simplicity in Compose.
     image: gcr.io/${GCP_PROJECT_ID}/frontend:latest
     container_name: frontend
     restart: unless-stopped
     ports:
-      # Exposes the web server on the standard HTTP port 80.
       - "80:80"
     networks:
       - dream-vacation-net
-    # The frontend depends on the backend being available.
     depends_on:
       - backend
 
-  # The Backend Service (Node.js API)
   backend:
     image: gcr.io/${GCP_PROJECT_ID}/backend:latest
     container_name: backend
     restart: unless-stopped
     ports:
-      # Exposes the API on port 3001.
       - "3001:3001"
     networks:
       - dream-vacation-net
     environment:
-      # These variables are loaded from a .env file on the server.
       - PORT=3001
       - DB_USER=${DB_USER}
       - DB_NAME=${DB_NAME}
       - DB_PASSWORD=${DB_PASSWORD}
-      # This is the key: it connects to the proxy using its service name.
-      - DB_HOST=cloud-sql-proxy 
+      - DB_HOST=cloud-sql-proxy
       - COUNTRIES_API_BASE_URL=${COUNTRIES_API_BASE_URL}
-    # This is the solution to your race condition. The backend will not start
-    # until the cloud-sql-proxy service is reported as "healthy".
     depends_on:
       cloud-sql-proxy:
         condition: service_healthy
 
-  # The Cloud SQL Auth Proxy Service
   cloud-sql-proxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.2
     container_name: cloud-sql-proxy
@@ -54,14 +42,15 @@ services:
     networks:
       - dream-vacation-net
     command:
-      # The command to start the proxy, including the health check flag.
-      - "--public-ip"
+      # Correct v2 syntax: INSTANCE --flags
       - "${CLOUD_SQL_CONNECTION_NAME}"
-      - "--health-check"
-    # This is the built-in health check that solves the startup order problem.
-    # Docker will ping this endpoint to see if the proxy is ready.
+      - "--address=0.0.0.0" # Listen on all network interfaces
+      - "--port=3306"       # CORRECTED: The default MySQL port
+      - "--health-check"    # Enable the health check endpoint
+    # The health check port does not need to be exposed to the host.
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:9090/healthz"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
