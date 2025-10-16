@@ -1,51 +1,29 @@
-version: '3.8'
-
-networks:
-  dream-vacation-net:
-    driver: bridge
+version: '3.9'
 
 services:
-  frontend:
-    image: gcr.io/${GCP_PROJECT_ID}/frontend:latest
-    container_name: frontend
-    restart: unless-stopped
+  cloud-sql-proxy:
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.2
+    command: "${CLOUD_SQL_CONNECTION_NAME}?enable_iam_login=false"
+    environment:
+      - CLOUD_SQL_CONNECTION_NAME=${CLOUD_SQL_CONNECTION_NAME}
     ports:
-      - "80:80"
-    networks:
-      - dream-vacation-net
-    depends_on:
-      - backend
+      - "3306:3306"
+    restart: unless-stopped
 
   backend:
     image: gcr.io/${GCP_PROJECT_ID}/backend:latest
-    container_name: backend
-    restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "3001:3001"
-    networks:
-      - dream-vacation-net
-    environment:
-      - PORT=3001
-      - DB_USER=${DB_USER}
-      - DB_NAME=${DB_NAME}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_HOST=cloud-sql-proxy
-      - COUNTRIES_API_BASE_URL=${COUNTRIES_API_BASE_URL}
     depends_on:
-      cloud-sql-proxy:
-        condition: service_started  # changed from service_healthy for now
-
-  cloud-sql-proxy:
-    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.2
-    container_name: cloud-sql-proxy
+      - cloud-sql-proxy
     restart: unless-stopped
-    networks:
-      - dream-vacation-net
-    command:
-      - "${CLOUD_SQL_CONNECTION_NAME}"
-      - "--address=0.0.0.0"
-      - "--port=3306"
-      - "--health-check"
-    # Expose healthcheck port only internally
-    expose:
-      - "3306"
+
+  frontend:
+    image: gcr.io/${GCP_PROJECT_ID}/frontend:latest
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

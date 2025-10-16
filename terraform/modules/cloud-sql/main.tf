@@ -21,3 +21,9 @@ resource "google_sql_user" "dev" {
   password = var.db_password
 }
 
+resource "google_sql_database" "dream_vacations_db" {
+  name     = var.db_name                
+  instance = google_sql_database_instance.main.name
+  project  = var.project_id
+}
+
