@@ -40,7 +40,7 @@ resource "google_compute_instance" "main" {
   }
 
   metadata = {
-    ssh-keys = "apps-user:${var.ssh_public_key}"
+    ssh-keys = "app-user:${var.ssh_public_key}"
   }
 
   metadata_startup_script = <<-EOT
