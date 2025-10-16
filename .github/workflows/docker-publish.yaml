@@ -93,7 +93,27 @@ jobs:
           username: app-user
           key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
           script: |
-            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock google/sdk:latest gcloud auth configure-docker gcr.io -q
+            # Check for Docker and install if not present
+            if ! [ -x "$(command -v docker)" ]; then
+              echo "Docker not found, installing..."
+              sudo apt-get update
+              sudo apt-get install -y docker.io
+              sudo usermod -aG docker app-user
+            fi
+
+            # Check for gcloud and install if not present
+            if ! [ -x "$(command -v gcloud)" ]; then
+              echo "gcloud not found, installing..."
+              sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
+              echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+              curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+              sudo apt-get update && sudo apt-get install -y google-cloud-sdk
+            fi
+
+            # Authenticate Docker to GCR
+            gcloud auth configure-docker gcr.io -q
+
+            # Deploy the container
             docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
             docker stop backend-container || true
             docker rm backend-container || true
@@ -117,7 +137,27 @@ jobs:
           username: app-user
           key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
           script: |
-            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock google/sdk:latest gcloud auth configure-docker gcr.io -q
+            # Check for Docker and install if not present
+            if ! [ -x "$(command -v docker)" ]; then
+              echo "Docker not found, installing..."
+              sudo apt-get update
+              sudo apt-get install -y docker.io
+              sudo usermod -aG docker app-user
+            fi
+            
+            # Check for gcloud and install if not present
+            if ! [ -x "$(command -v gcloud)" ]; then
+              echo "gcloud not found, installing..."
+              sudo apt-get install -y apt-transport-https ca-certificates gnupg curl
+              echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+              curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+              sudo apt-get update && sudo apt-get install -y google-cloud-sdk
+            fi
+
+            # Authenticate Docker to GCR
+            gcloud auth configure-docker gcr.io -q
+            
+            # Deploy the frontend container
             docker pull gcr.io/${{ secrets.GCP_PROJECT_ID }}/frontend:${{ github.sha }}
             docker stop frontend-container || true
             docker rm frontend-container || true

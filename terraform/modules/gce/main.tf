@@ -25,7 +25,7 @@ resource "google_compute_instance" "main" {
 
   boot_disk {
     initialize_params {
-      image = "cos-cloud/cos-stable"
+      image = "debian-cloud/debian-11"
     }
   }
 
@@ -45,7 +45,8 @@ resource "google_compute_instance" "main" {
 
   metadata_startup_script = <<-EOT
     #!/bin/bash
-    systemctl start docker
+    # Add app-user to the Google sudoers group
+    usermod -aG google-sudoers app-user
   EOT
 }
 
