@@ -103,7 +103,7 @@ jobs:
             # Run the new container with environment variables
             docker run -d --name backend-container -p 3001:3001 --restart always \
               -e PORT=3001 \
-              -e DB_USER="app_user" \
+              -e DB_USER="dev" \
               -e DB_NAME="dream_vacations_db" \
               -e DB_HOST="${{ secrets.CLOUD_SQL_CONNECTION_NAME }}" \
               gcr.io/${{ secrets.GCP_PROJECT_ID }}/backend:${{ github.sha }}
