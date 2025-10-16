@@ -4,8 +4,8 @@ provider "google" {
 }
 
 module "secret_manager" {
-  source     = "./modules/secret-manager"
-  project_id = var.project_id
+  source              = "./modules/secret-manager"
+  project_id          = var.project_id
   initial_db_password = var.initial_db_password
 }
 
@@ -14,7 +14,7 @@ module "cloud_sql" {
   project_id            = var.project_id
   region                = var.region
   db_password_secret_id = module.secret_manager.secret_id
-  db_password = module.secret_manager.secret_value
+  db_password           = module.secret_manager.secret_value
 }
 
 module "gce" {
