@@ -1,6 +1,6 @@
 terraform {
   backend "gcs" {
-    bucket  = "oao-terraform-state"
-    prefix  = "terraform/state"
+    bucket = "oao-terraform-state"
+    prefix = "terraform/state"
   }
 }
