@@ -82,3 +82,11 @@ resource "google_compute_firewall" "allow_ssh" {
   source_ranges = ["0.0.0.0/0"]
   target_tags   = ["allow-ssh"]
 }
+
+# Allow the GCE service account to connect to Cloud SQL instances
+resource "google_project_iam_member" "cloudsql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.gce_sa.email}"
+}
+
