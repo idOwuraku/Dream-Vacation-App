@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: 'read'
       id-token: 'write'
-      pull-requests: 'write' 
+      pull-requests: 'write'
 
     steps:
       - name: Checkout Repository
@@ -31,7 +31,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.13.4
+          terraform_version: 1.5.0
 
       - name: Terraform Init
         id: init
@@ -48,12 +48,11 @@ jobs:
         run: terraform validate -no-color
         working-directory: ./terraform
 
-      
       - name: Terraform Plan and Comment
         if: github.event_name == 'pull_request'
-        uses: helm-github-actions/terraform-plan@v1.5.0
+        uses: dflook/terraform-plan@v1
         with:
-          path: ./terraform
+          path: terraform
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Terraform Apply
