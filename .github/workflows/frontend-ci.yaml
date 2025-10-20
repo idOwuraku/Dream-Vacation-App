@@ -13,4 +13,4 @@ jobs:
       - name: Build frontend image
         run: |
           docker build . --tag frontend-dream-vac:$(date +%s)
-        working-directory: ../frontend
+        working-directory: ./frontend
