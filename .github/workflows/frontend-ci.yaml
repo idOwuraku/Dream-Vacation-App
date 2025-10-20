@@ -11,4 +11,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build frontend image
-        run: docker build ../fronted --file ../frontend/Dockerfile --tag frontend-dream-vac:$(date + %s)
+        run: docker build ../fronted --file ../frontend/Dockerfile --tag frontend-dream-vac:$(date +%s)
