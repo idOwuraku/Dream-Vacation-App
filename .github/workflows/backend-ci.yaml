@@ -11,6 +11,6 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - name: Build backend
-              run: docker build ../backend --file ../backend Dockerfile --tag backend-dream-vacs:$(date + %Y%m%d-%H%M)
+              run: docker build ../backend --file ../backend Dockerfile --tag backend-dream-vacs:$(date+%s)
 
     
