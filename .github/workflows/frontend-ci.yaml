@@ -1,0 +1,14 @@
+name: Frontend Image CI
+on: 
+  push:
+    branches:
+     - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: action/checkout@v4
+      - name: Build frontend image
+        run: docker build ../fronted --file ../frontend/Dockerfile --tag frontend-dream-vac:$(date + %Y%m%d-%H%M)
