@@ -1,17 +1,89 @@
 name: Backend Image CI
 on:
-    push:
-        branches:
-            - main
+  push:
+    branches:
+      - main
+
+env: 
+  GCP_REGION: 'africa-south1'
+  GAR_REPOSITORY: 'docker-repo'
+  IMAGE_NAME: dream-vacs-backend
 
 jobs:
-    build:
-        runs-on: ubuntu-latest
+  build-scan:
+    runs-on: ubuntu-latest
 
-        steps:
-            - uses: actions/checkout@v4
-            - name: Build backend
-              run: |
-                docker build . --tag backend-dream-vacs:$(date +%s)
-              working-directory: ./backend
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+      security-events: 'write'
+
+    steps:
+      - name: Code checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        id: auth
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SA_EMAIL }}
+
+
+      - name: Run Trivy Filesystem Scan
+        uses: aquasecurity/trivy-action@master
+        with: 
+          scan-type: 'fs'
+          scan-ref: './backend'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Set up Cloud SDK
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+
+      - name: Build and Push to Artifact Registry
+        id: docker_build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha}}
+
+      - name: Run Trivy Image Scan
+        uses: aquasecurity/trivy-action@master
+        with: 
+          image-ref: ${{ steps.docker_build.outputs.digest }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Generate Full Security Report (SARIF)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.docker_build.outputs.digest }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN'
+          ignore-unfixed: false
+          exit-code: 0
+
+      - name: Upload Full Report to GitHub Security Tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+        
+
+          
+
+
+
+
+
     
